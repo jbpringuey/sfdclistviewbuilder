@@ -1,0 +1,23 @@
+Listing Title:
+Infinite Views
+
+Tagline:
+Simple app to create custom views with advanced filters from your phone.
+
+Brief Description:
+Infinite Views  is a simple and powerful application which enables salesforce1 users to define ad hoc custom views against any objects and attributes available in the organization (Account, leads, custom objects ..) with advanced filters all in one page.
+
+Highlight 1:
+Define advanced search criteria for each view (Support for relationships traversing and all data types)
+
+Highlight 2:
+Works with any salesforce with very basic configuration with no coding or force.com skills required.
+
+Highlight 3:
+View multiple objects in one page and define as many criteria as you would like in few click
+
+Full Description:
+Infinite Views is a simple and powerful application which enables salesforce1 users to define ad hoc custom views against any objects and attributes available in the organization (Account, leads, custom objects ..) with advanced filters all in one page.
+
+The installation of the application is a very basic 1 step process and can be added/removed very easily. This is a namespaced unmanaged package allowing great customization/maintenance.
+

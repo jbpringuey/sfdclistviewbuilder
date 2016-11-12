@@ -1,0 +1,134 @@
+<apex:page showHeader="false" controller="infiniteviews_ViewController"  standardStylesheets="false">
+
+<apex:stylesheet value="{!URLFOR($Resource.InfiniteViews,'icons.css')}"/>
+<apex:stylesheet value="{!URLFOR($Resource.InfiniteViews,'styles.css')}"/>
+<apex:stylesheet value="{!URLFOR($Resource.InfiniteViews,'OneStarter.css')}"/>
+<apex:includeScript value="{!URLFOR($Resource.InfiniteViews,'jquery.js')}"/>
+<apex:includeScript value="{!URLFOR($Resource.InfiniteViews,'jquery.onestarter.js')}"/>
+
+<script>
+    $(document).ready( function() {
+        s1 = $('div#one-app').oneStarter('app');
+        loadAlert();
+       
+        $('#manageAlert').click(function() {
+          sforce.one.navigateToURL('/apex/infiniteviews_ManageViews',false);
+        });    
+    });
+    
+    function buildList(data){
+        $('#content').empty();
+        if(jQuery.isEmptyObject(data) || data.length==0) {
+            var message = $("<h1></h1>").addClass("fl man fw-normal f5 text-color-1")
+            .text("You have not defined any view yet, click on manage view to add one.");
+            $('#content').append(message);
+        } else {
+        
+        	var iconCounter = 0; // to choose a custom icon
+        
+            for(var index=0; index < data.length; index++){
+            	var counter = index + 1;
+                var view = data[index].view;
+                var alertTitle = $("<h2></h2>").html(view.Name);
+                $('#content').append(alertTitle); 
+                var child =$("<div></div>");
+                child.attr("id","record-list"); 
+                
+                var results = data[index].results;
+                
+                var objectName = view.Object__c.toLowerCase();
+                
+				var iconName = "icon--" + objectName; // standard icon
+				if(objectName.match(/__c$/)) { // needs custom icon
+					iconCounter += 1;
+					iconName = "icon--custom-"+iconCounter;
+				}
+				
+				var iconClass = "icon icon-left "+ iconName +" bgs-100 a-mid mhm sq-30";
+                
+                $.each(results, function(key, value) {  
+                
+                    var article = $("<article></article>");
+                    article.addClass("padded result mam bg-1 border border--3 brm pam mtn");
+                    article.data("Id",value["Id"]);  
+                    article.click(function() {
+                           var id=$(this).data("Id");
+                           if(typeof sforce != 'undefined'){
+                               sforce.one.navigateToSObject(id);
+                           }else{
+                               window.location.href="../"+id;
+                           }
+                    });                                           
+                    var table = $('<table></table>');
+                    var tr = $('<tr></tr>');
+                    table.append(tr);
+                    var tdl = $('<td></td>').width(50);
+                    tr.append(tdl);
+                    
+                    tdl.append($("<div></div>").addClass(iconClass));
+                    var tdr = $('<td></td>');
+                    tr.append(tdr);
+
+                    var lowerCaseAttributes = {};
+                    for(var attribute in value){
+                        lowerCaseAttributes[attribute.toLowerCase()]= value[attribute];   
+                    }
+                    
+                    var label = lowerCaseAttributes[view.Label__c];
+                    if(view.Secondary_label__c && view.Secondary_label__c!='' && 
+                    lowerCaseAttributes[view.Secondary_label__c] && lowerCaseAttributes[view.Secondary_label__c]!=''){
+                        label=label+' - '+lowerCaseAttributes[view.Secondary_label__c]; 
+                    }
+                    
+                    tdr.append($("<span></span>").html(label));
+                    article.prepend(table);
+                    
+                    child.append(article);
+               });
+               if(results.length!=0){
+                   $('#content').append(child);  
+               }else if(data[index].errorMessage){
+                   var message = $("<h1></h1>").addClass("fl man fw-normal f5 text-color-1")
+                    .text(data[index].errorMessage);
+                   $('#content').append(message);
+                   $('#content').append($("<br/>"));
+               }else{
+                   var message = $("<h1></h1>").addClass("fl man fw-normal f5 text-color-1")
+                    .text("There are currently no results matching your criteria.");
+                   $('#content').append(message);
+                   $('#content').append($("<br/>"));
+               }
+                
+            };
+        }
+    }
+    
+    function loadAlert() {
+        infiniteviews_ViewController.runAlerts(
+            function(result, event){
+                if(event.status){
+                    buildList(result);
+                } else if (event.type === 'exception'){
+                    console.log(result);
+                } else {
+                    // unexpected problem...
+                }
+            }
+         ); 
+    }
+   
+ </script>   
+
+
+<div id="one-app">
+
+     <button id="manageAlert" class="btn bg-primary-btn btn--primary pvs size-full brm border border--1 wht f3 fw-semibold">
+      <span class="text-color-4 f3 fw-semibold">Manage views</span>
+    </button>
+    <br/>
+    <div id="content"/>
+</div>
+
+
+
+</apex:page>

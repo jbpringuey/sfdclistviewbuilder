@@ -1,0 +1,547 @@
+<apex:page showHeader="false"  controller="infiniteviews_ViewController" docType="html-5.0">
+
+<apex:stylesheet value="{!URLFOR($Resource.InfiniteViews,'icons.css')}"/>
+<apex:stylesheet value="{!URLFOR($Resource.InfiniteViews,'styles.css')}"/>
+<apex:stylesheet value="{!URLFOR($Resource.InfiniteViews,'OneStarter.css')}"/>
+<apex:stylesheet value="{!URLFOR($Resource.InfiniteViews,'app.css')}"/>
+
+<apex:includeScript value="{!URLFOR($Resource.InfiniteViews,'jquery.js')}"/>
+<apex:includeScript value="{!URLFOR($Resource.InfiniteViews,'jquery.onestarter.js')}"/>
+
+<script>
+var backOption = "--Reset Relationship--";
+var noneOption = "--None--";
+var operators = {
+            "ID":["Equals","Not Equals"],
+            "STRING":["Equals","Not Equals","Contains","Not Contains"],
+            "PHONE":["Equals","Not Equals"],
+            "URL":["Equals","Not Equals"],
+            "TEXTAREA":["Equals","Not Equals","Contains","Not Contains"],
+            "EMAIL":["Equals","Not Equals"],
+            "COMBOBOX":["Equals","Not Equals"],
+            "BOOLEAN":["Equals"],
+            "PICKLIST":["Equals","Not Equals"],
+            "MULTIPICKLIST":["Equals","Not Equals"],
+            "REFERENCE":["Equals","Not Equals"],
+            
+            "DATE":["Less Than","Equals","Not Equals","Greater Than"],
+            "TIME":["Less Than","Equals","Not Equals","Greater Than"],
+            "DATETIME":["Less Than","Equals","Not Equals","Greater Than"],
+            
+            "INTEGER":["Less Than","Equals","Not Equals","Greater Than"],
+            "DOUBLE":["Less Than","Equals","Not Equals","Greater Than"],
+            "PERCENT":["Less Than","Equals","Not Equals","Greater Than"],
+            "CURRENCY":["Less Than","Equals","Not Equals","Greater Than"]
+        };
+
+ var allObjects;
+
+<apex:repeat value="{!alertIndex}" var="integer" >
+ var allAttributes{!integer};
+ var selectedFieldType{!integer};                 
+</apex:repeat>   
+
+var alertId;
+
+$(document).ready( function() {
+        s1 = $('div#one-app').oneStarter('app');
+        $('#loading').hide();
+        $('#manageAlert').click(function() {
+              sforce.one.navigateToURL('/apex/infiniteviews_ManageViews',false);
+        }); 
+         $('#saveAlert').click(function() {
+             var criterions = [];
+             var alert = {};
+             /*For each criteria on server side for performance and to make it easier */
+             <apex:repeat value="{!alertIndex}" var="integer" >
+                var value{!integer};
+                if(
+                                selectedFieldType{!integer}=="PICKLIST" ||
+                                selectedFieldType{!integer}=="BOOLEAN" ||
+                                selectedFieldType{!integer}=="MULTIPICKLIST"||
+                                selectedFieldType{!integer}=="COMBOBOX"
+                ){
+                     value{!integer} = $("#ValuePickList{!integer}").val();    
+                }else{
+                    if((selectedFieldType{!integer}=='DOUBLE'||
+                       selectedFieldType{!integer}=='INTEGER'||
+                       selectedFieldType{!integer}=='PERCENT'||
+                       selectedFieldType{!integer}=='DATE' ||
+                       selectedFieldType{!integer}=='TIME' ||
+                       selectedFieldType{!integer}=='DATETIME') &&
+                       !$.isNumeric($("#ValueText{!integer}").val())){
+                       $("#validationText{!integer}").text("Number value is required");
+                       return ; 
+                    }else{
+                        value{!integer} = $("#ValueText{!integer}").val(); 
+                    }
+                }
+                if(noneOption!=$("#Attribute{!integer}").val()){
+                    // used to load attribute that are filterable in the relationship objects
+                    var filterObjectName{!integer} = $("#Subobject{!integer}").val();
+                    if(!filterObjectName{!integer} || filterObjectName{!integer}==''){
+                        //object is the same
+                        filterObjectName{!integer} = $("#Object").val();
+                    }
+                    criterions.push({
+                         "Attribute__c": $("#relationshipName{!integer}").text()+$("#Attribute{!integer}").val(),
+                         "Operator__c": $("#Operator{!integer}").val(),
+                         "Value__c":value{!integer},
+                         "Filter_field_type__c":selectedFieldType{!integer},
+                         "ObjectName__c":filterObjectName{!integer}
+                     });
+                 }
+
+             </apex:repeat> 
+             $('#editPage').hide();
+             $('#loading').show();
+             
+             var secondaryField = null;
+             
+             if($("#SecondaryLabel").val()!=noneOption){
+                 secondaryField = $("#SecondaryLabel").val();
+             }
+             
+             if(alertId && alertId!=''){
+                 infiniteviews_ViewController.editAlert(
+                     [{
+                     "Id":alertId,
+                     "Name":$("#AlertName").val(),
+                     "Object__c":$("#Object").val(),
+                     "Label__c":$("#Label").val(),
+                     "Secondary_label__c":secondaryField
+                     }],
+                     criterions,
+                     function(result, event){
+              			sforce.one.navigateToURL('/apex/infiniteviews_ManageViews',true);
+                        if(event.status){
+                        
+                        } else if (event.type === 'exception'){
+                            console.log(result);
+                        } else {
+                            // unexpected problem...
+                        }
+                 });
+             }else{
+                 infiniteviews_ViewController.createAlert(
+                     [{
+                     "Name":$("#AlertName").val(),
+                     "Object__c":$("#Object").val(),
+                     "Label__c":$("#Label").val(),
+                     "Secondary_label__c":secondaryField
+                     }],
+                     criterions,
+                     function(result, event){
+              			sforce.one.navigateToURL('/apex/infiniteviews_ManageViews',true);
+                        if(event.status){
+                            sforce.one.back();
+                        } else if (event.type === 'exception'){
+                            console.log(result);
+                        } else {
+                            // unexpected problem...
+                        }
+                    }
+                );
+            }
+        });
+        
+        
+        $('#Object').on('change', function() {
+            getAttributes(
+                this.value,
+                function(attributes){
+                    populateLabels(attributes);
+                    <apex:repeat value="{!alertIndex}" var="integer" >
+                        populateAttributes{!integer}(attributes);
+                    </apex:repeat> 
+                });  
+        });
+
+        <apex:repeat value="{!alertIndex}" var="integer" >
+            $('#Attribute{!integer}').on('change', function() {
+                    populateOperator{!integer}();
+            });
+        </apex:repeat> 
+        
+        // Populate existing values.  
+        alertId = $.urlParam('id');
+        
+		var htmlDecode = function(value) {
+		    if (value) {
+		        return $('<div />').html(value).text();
+		    } else {
+		        return '';
+		    }
+		}
+
+        if(alertId && alertId!=''){
+            
+            infiniteviews_ViewController.getInitialCriterions(alertId,
+                function(result, event){
+                    if(event.status) {
+                        var criteria;
+                        var index = 0;
+                        var sharedAttributes = result[0];
+                        populateObjects(sharedAttributes.objects);
+                        populateLabels(sharedAttributes.labels);
+                        
+                        var alert = sharedAttributes.view;
+                        $('#AlertName').val(htmlDecode(alert.Name)); // val() escapes the input, so we have to unescape it first
+                        $("#Object").val(alert.Object__c);
+                        $("#Label").val(alert.Label__c);
+                        if(alert.Secondary_label__c){
+                            $("#SecondaryLabel").val(alert.Secondary_label__c);
+                        }
+                       
+                        <apex:repeat value="{!alertIndex}" var="integer" >
+                            index = {!integer};
+                            if(index<result.length){
+                                criteria = result[index];
+                                var selectedAttribute{!integer} = extractRelationship{!integer}(criteria.selectedAttribute);
+                                populateAttributes{!integer}(criteria.filterattributes);
+                                $("#Attribute{!integer}").val(selectedAttribute{!integer});
+                                populateOperator{!integer}();
+                                $('#Operator{!integer}').val(criteria.selectedOperator);
+                                $("#Subobject{!integer}").val(criteria.selectedSubObject);
+                                if(
+                                    selectedFieldType{!integer}=="PICKLIST" ||
+                                    selectedFieldType{!integer}=="BOOLEAN" ||
+                                    selectedFieldType{!integer}=="MULTIPICKLIST"||
+                                    selectedFieldType{!integer}=="COMBOBOX"
+                                ){
+                                    $('#ValuePickList{!integer}').val(criteria.selectedValue);    
+                                }else{
+                                    $('#ValueText{!integer}').val(criteria.selectedValue);   
+                                }
+                            }else{
+                                populateAttributes{!integer}(sharedAttributes.labels);
+                            }
+                        </apex:repeat>     
+                    } else if (event.type === 'exception'){
+                        console.log(result);
+                    } else {
+                        // unexpected problem...
+                    }
+            });
+        }else{
+            $("#AlertName").val("1 - My alert");
+            getObjects(
+                function(objects){
+                    populateObjects(objects);
+                    getAttributes(
+                        $("#Object").val(),
+                        function(attributes){
+                            populateLabels(attributes);
+                            <apex:repeat value="{!alertIndex}" var="integer" >
+                                populateAttributes{!integer}(attributes);
+                            </apex:repeat> 
+                    }); 
+                }
+            );
+        }
+      }
+    );
+    
+
+    
+    function getCriteria(alertId, callback){
+        infiniteviews_ViewController.getCriterion(alertId,
+            function(result, event){
+                if(event.status) {
+                    callback(result);
+                } else if (event.type === 'exception'){
+                    console.log(result);
+                } else {
+                    // unexpected problem...
+                }
+            });
+    };
+    
+    function populateObjects(objects){
+        allObjects = objects;
+        var sortedKeys=[];
+        $.each(objects, function(key) {   
+             sortedKeys.push(key);     
+        });
+        sortedKeys.sort();
+        $('#Object').empty();
+        $.each(sortedKeys, function(key, value) {   
+            $('#Object')
+            .append($("<option></option>")
+            .attr("value",objects[value])
+            .text(value)); 
+        });
+    }
+    
+    function getObjects(callback){
+        infiniteviews_ViewController.getObjects(
+            function(result, event){
+                if(event.status){
+                    callback(result);
+                } else if (event.type === 'exception'){
+                    console.log(result);
+                } else {
+                    // unexpected problem...
+                }
+            }
+        );
+    };
+    
+    function getAttributes(objectName,callback){
+        infiniteviews_ViewController.getAttributes(
+            objectName,
+            function(result, event){
+                if(event.status){
+                    callback(result);
+                } else if (event.type === 'exception'){
+                    console.log(result);
+                } else {
+                    // unexpected problem...
+                }
+         });
+    };
+    
+    function bindToPicklist(node, values, attributes) {
+            node.empty();
+            $.each(values, function(key, value) {
+                node.append($("<option></option>")
+                    .attr("value", attributes[value][0])
+                    .text(value));
+            });
+    };
+
+    function populateLabels(attributes){
+        var sortedKeys=[];
+        $.each(attributes, function(key) {   
+            sortedKeys.push(key);     
+        });
+        sortedKeys.sort();
+        bindToPicklist($('#Label'),sortedKeys, attributes);
+        sortedKeys.unshift(noneOption);
+        attributes[noneOption]= [noneOption,noneOption];
+        bindToPicklist($('#SecondaryLabel'),sortedKeys, attributes);
+    }
+
+    <apex:repeat value="{!alertIndex}" var="integer" >
+        function populateAttributes{!integer}(attributes){
+            if($("#relationshipName{!integer}").text()!=''){
+                attributes[backOption]= [backOption,backOption];        
+            }else{
+                attributes[noneOption]= [noneOption,noneOption]; 
+            }
+            allAttributes{!integer} = attributes;
+            var sortedKeys=[];
+            $.each(attributes, function(key) {   
+                sortedKeys.push(key);     
+            });
+            sortedKeys.sort();
+            bindToPicklist($('#Attribute{!integer}'), sortedKeys, attributes);
+            $("#Attribute{!integer}").val(attributes[sortedKeys[0]][0]);
+            
+            $('#Operator{!integer}').empty();
+            $('#ValuePickList{!integer}').empty();
+            $('#ValueText{!integer}').empty();
+        }
+    
+        function extractRelationship{!integer}(input){
+            var n = input.lastIndexOf(".");
+            var relationship = '';
+            if(n!=-1){
+                relationship = input.substring(0,n+1);
+                $("#subObjectText{!integer}").text("You selected a relationship new attributes are available:");
+                $("#relationshipName{!integer}").text(relationship);
+                return input.substring(n+1,input.length);
+            }else{
+                $("#subObjectText{!integer}").text('');
+                $("#relationshipName{!integer}").text('');
+                return input;
+            }
+        }
+        
+        function backRelationship{!integer}(){
+             $("#subObjectText{!integer}").text('');
+             $("#relationshipName{!integer}").text('');
+             return $("#Object").val();
+        }
+        
+        function populateOperator{!integer}(){
+
+                var selectedKey = $("#Attribute{!integer} option:selected").text();
+                if(selectedKey ==''){
+                    return;
+                }
+
+                if(selectedKey == noneOption){
+                    $('#Operator{!integer}').empty();
+                    $('#ValuePickList{!integer}').empty();
+                    $('#ValueText{!integer}').empty();
+                    return;
+                }
+                
+                if(selectedKey == backOption){
+                    getAttributes(
+                      backRelationship{!integer}(),
+                      function(attributes){
+                          populateAttributes{!integer}(attributes);
+                    });
+                    return;
+                }
+                
+                if(allAttributes{!integer}[selectedKey][1]=="REFERENCE"){
+                    var objectName = allAttributes{!integer}[selectedKey][0];
+                    
+                    var newRelationshipValue = $("#relationshipName{!integer}").text()+
+                    objectName+".";
+                    
+                    $("#relationshipName{!integer}").text(newRelationshipValue);
+                    extractRelationship{!integer}(newRelationshipValue);
+                    $("#Subobject{!integer}").val(allAttributes{!integer}[selectedKey][2]);
+                    
+                    getAttributes(
+                      allAttributes{!integer}[selectedKey][2],
+                      function(attributes){
+                          populateAttributes{!integer}(attributes);
+                    });
+                    return; 
+                }
+                
+                $('#Operator{!integer}').empty();
+                $.each(operators[allAttributes{!integer}[selectedKey][1]], function(key,value) {   
+                    $('#Operator{!integer}')
+                    .append($("<option></option>")
+                    .attr("value",value)
+                    .text(value)); 
+               });
+               
+               if(
+                allAttributes{!integer}[selectedKey][1]=="PICKLIST" ||
+                allAttributes{!integer}[selectedKey][1]=="BOOLEAN" ||
+                allAttributes{!integer}[selectedKey][1]=="MULTIPICKLIST"||
+                allAttributes{!integer}[selectedKey][1]=="COMBOBOX"
+                ){
+                   $('#ValueTextDiv{!integer}').hide();
+                   $('#ValuePicklistDiv{!integer}').show();
+                   $('#helperText{!integer}').hide();
+                   $('#ValuePickList{!integer}').empty();
+                   var picklistValues = allAttributes{!integer}[selectedKey].slice(2,allAttributes{!integer}[selectedKey].length);
+                   if(allAttributes{!integer}[selectedKey][1]=="BOOLEAN" && picklistValues.length==0){
+                       picklistValues.push(true);
+                       picklistValues.push(false);
+                       
+                   }
+                   $.each(picklistValues, function(key,value) {   
+                             $('#ValuePickList{!integer}')
+                                 .append($("<option></option>")
+                                 .attr("value",value)
+                                 .text(value)); 
+                   });
+                   
+               }else{
+                   if(allAttributes{!integer}[selectedKey][1]=="DATE" ||
+                   allAttributes{!integer}[selectedKey][1]=="TIME" ||
+                   allAttributes{!integer}[selectedKey][1]=="DATETIME"  ){
+                       $('#helperText{!integer}').show();
+                       $('#helperText{!integer}').text("Input the number of days to add or substract to the current date");   
+                   }else{
+                       $('#helperText{!integer}').hide();
+                   }
+                   $('#ValueTextDiv{!integer}').show();
+                   $('#ValuePicklistDiv{!integer}').hide();
+               }
+               selectedFieldType{!integer} = allAttributes{!integer}[selectedKey][1];
+        }
+
+    </apex:repeat>     
+    
+    // Utility; parse out parameter by name from URL query string from the documentation
+    $.urlParam = function(name){
+        var results = new RegExp('[\\?&]' + name + '=([^&#]*)')
+            .exec(window.location.href);
+        if(results && results[1]) {
+            return results[1];
+        } else return 0;
+    }
+</script>   
+
+<div id="one-app">
+    
+    <div id="loading">
+        <div class="tc">
+          <img src="{!URLFOR($Resource.InfiniteViews,'assets/loading-gray.gif')}" alt="loading" class="sq-20 dib"/>
+        </div>
+    </div>
+    
+    <div id="editPage">
+        <button id="manageAlert" class="btn bg-secondary-btn btn--secondary pvs size-full brm border border--3">
+          <span class="text-color-4 f3 fw-semibold">Cancel</span>
+        </button>
+        <br/>
+        <button id="saveAlert" class="btn bg-secondary-btn btn--secondary pvs size-full brm border border--3">
+          <span class="text-color-4 f3 fw-semibold">Save</span>
+        </button>
+        <br/>
+    
+        <apex:form >
+            <label class="f4 text-color-1">View Name - Used to sort the main page</label>
+            <input type="text" id="AlertName" class="mbm size-full phm pvm input input--default input--ph-1 input--focus-1" />
+            <label class="f4 text-color-1">Main object to query</label>
+            <div class="form-control-group">
+                <div class="form-control form-control-select">
+                    <select id="Object"/>
+                </div>
+            </div>
+            <label class="f4 text-color-1">Field used for label</label>
+            <div class="form-control-group">
+                <div class="form-control form-control-select">
+                    <select id="Label"/>
+                </div>
+            </div>
+             <br/>
+            <label class="f4 text-color-1">Secondary Field used for label</label>
+            <div class="form-control-group">
+                <div class="form-control form-control-select">
+                    <select id="SecondaryLabel"/>
+                </div>
+            </div>
+             <br/>
+          <apex:repeat value="{!alertIndex}" var="integer" >
+        
+                <h2>Filter criteria {!integer}</h2>
+                <br/>
+                <span id="subObjectText{!integer}" class="f4 text-color-1"/>
+                <br/>
+                <span id="relationshipName{!integer}" class="f4 text-color-1"/>
+                <br/>
+                <input type="hidden" id="Subobject{!integer}"/>
+                
+                <label class="f4 text-color-1">Attribute used to filter</label>
+                <div class="form-control-group">
+                    <div class="form-control form-control-select">
+                        <select id="Attribute{!integer}"/>
+                    </div>
+                </div>
+                <label class="f4 text-color-1">Operator used to filter</label>
+                <div class="form-control-group">
+                    <div class="form-control form-control-select">
+                        <select id="Operator{!integer}"/>
+                    </div>
+                </div>
+                <label class="f4 text-color-1">Value used to filter</label>
+                <br/>
+                <span id="helperText{!integer}"/>
+                <span id="validationText{!integer}"/>
+                <div id="ValueTextDiv{!integer}">
+                    <input type="text" id="ValueText{!integer}" class="mbm size-full phm pvm input input--default input--ph-1 input--focus-1" />
+                </div>
+                <div class="form-control-group" id="ValuePicklistDiv{!integer}" style="display:none">
+                    <div class="form-control form-control-select">
+                        <select id="ValuePickList{!integer}"/>
+                    </div>
+                </div>
+                
+          </apex:repeat>  
+        </apex:form>
+    </div>
+</div>
+
+</apex:page>
